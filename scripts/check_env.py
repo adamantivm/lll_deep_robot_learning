@@ -74,18 +74,26 @@ def check_display(open_viewer):
         return
     print(f"{OK} X display {display} reachable")
     if open_viewer:
+        import threading
+
         import mujoco
         import mujoco.viewer
 
         m = mujoco.MjModel.from_xml_string(SCENE)
         d = mujoco.MjData(m)
+        before = set(threading.enumerate())
         with mujoco.viewer.launch_passive(m, d) as v:
             t0 = time.time()
             while v.is_running() and time.time() - t0 < 5:
                 mujoco.mj_step(m, d)
                 v.sync()
                 time.sleep(m.opt.timestep)
-        print(f"{OK} MuJoCo viewer window opened")
+        # launch_passive renders in a daemon thread and close() only *requests* exit. If the
+        # interpreter exits first, atexit's glfw.terminate() races the render loop -> segfault.
+        # Wait for the viewer thread to finish tearing down.
+        for t in set(threading.enumerate()) - before:
+            t.join(timeout=5)
+        print(f"{OK} MuJoCo viewer window opened (closes after 5 s by design)")
 
 
 def _which(cmd):

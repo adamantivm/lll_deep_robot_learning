@@ -9,6 +9,8 @@ Experiments are throwaway by default; optimize for learning fast, not for polish
   `shared/` is used by everyone, so be careful there and don't break other people's imports.
 - Never commit datasets, checkpoints or videos. Write them to `outputs/` (git-ignored).
 - Offscreen rendering: `MUJOCO_GL=egl`. GPU is small on some machines (4 GB), so keep batch sizes modest.
+- `mujoco.viewer.launch_passive` segfaults at interpreter exit unless you join its (daemon) viewer
+  thread after closing it; see `check_display()` in `scripts/check_env.py`.
 - Robot serial ports: prefer `/dev/serial/by-id/...` over `/dev/ttyACM0`. Never send motor commands
   to real hardware without the user confirming that the arm is clear and powered as expected.
 - Check the environment with `python scripts/check_env.py`.
