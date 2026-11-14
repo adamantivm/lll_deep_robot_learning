@@ -1,0 +1,63 @@
+{
+  "name": "lll-deep-robot-learning",
+  "build": { "dockerfile": "Dockerfile" },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+
+  // Adds --gpus all when the host has an NVIDIA GPU + container toolkit; starts fine without one.
+  "hostRequirements": { "gpu": "optional" },
+
+  // Runs on the HOST before the container starts: makes sure mount sources exist, allows X11 access.
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // Workspace is mounted at the same path as on the host, so Claude Code sees the same project
+  // (shared memory, session history, /resume) whether you run it on the host or in the container.
+  "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+  "workspaceFolder": "${localWorkspaceFolder}",
+
+  "runArgs": [
+    // Hot-pluggable hardware: /dev is bind-mounted (below) and these rules allow access by device class,
+    // so you can plug/unplug the arm or cameras without rebuilding the container.
+    "--device-cgroup-rule=c 166:* rmw", // /dev/ttyACM*  (SO-101 Feetech servo bus adapter)
+    "--device-cgroup-rule=c 188:* rmw", // /dev/ttyUSB*  (FTDI/CH340 serial adapters)
+    "--device-cgroup-rule=c 81:* rmw",  // /dev/video*   (USB cameras)
+    "--device-cgroup-rule=c 189:* rmw", // /dev/bus/usb  (raw USB: RealSense, libusb devices)
+    "--device-cgroup-rule=c 13:* rmw"   // /dev/input    (gamepads/teleop devices)
+  ],
+
+  "mounts": [
+    // Hardware
+    "source=/dev,target=/dev,type=bind",
+    // GUI windows (MuJoCo viewer, rerun, matplotlib) via X11 / XWayland
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+    // Claude Code: settings, credentials, plugins, memory, sessions + global state file
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
+    "source=${localEnv:HOME}/.claude.json,target=/home/vscode/.claude.json,type=bind",
+    // Caches that should survive container rebuilds
+    "source=lll-uv-cache,target=/home/vscode/.cache/uv,type=volume",
+    "source=lll-hf-cache,target=/home/vscode/.cache/huggingface,type=volume"
+  ],
+
+  "containerEnv": {
+    "NVIDIA_DRIVER_CAPABILITIES": "all",
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "HF_HOME": "/home/vscode/.cache/huggingface",
+    "QT_X11_NO_MITSHM": "1"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/home/vscode/.venv/bin/python",
+        "python.terminal.activateEnvironment": false
+      }
+    }
+  }
+}

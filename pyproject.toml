@@ -1,0 +1,42 @@
+[project]
+name = "lll-deep-robot-learning"
+version = "0.0.0"
+description = "Team playground for robot learning (SO-101, LeRobot, MuJoCo)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # LeRobot with Feetech servo support (SO-100/SO-101) and training extras
+    "lerobot[feetech,training]>=0.7",
+    # Listed explicitly so they come from the CUDA index below
+    "torch",
+    "torchvision",
+    "torchcodec",
+    # Simulation
+    "mujoco>=3.3",
+    "gymnasium>=1.0",
+    # Notebooks / plotting
+    "ipykernel",
+    "matplotlib",
+]
+
+[tool.uv]
+# This is a workspace of experiments, not an installable package.
+package = false
+
+# PyTorch from the CUDA 12.6 index: runs on NVIDIA drivers >= 560 (PyPI's default
+# wheels target the newest CUDA and need a very recent driver). Bump to cu128/cu130
+# once everyone's driver supports it (`nvidia-smi` shows the max CUDA version).
+[tool.uv.sources]
+torch = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
+torchvision = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
+torchcodec = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[dependency-groups]
+dev = ["ruff", "pytest"]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# Experiment outputs (datasets, checkpoints, logs): keep out of git, use HF Hub / W&B
+outputs/
+data/
+wandb/
+runs/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.mp4
+
+# Secrets / local
+.env
+.claude/settings.local.json
+.DS_Store
