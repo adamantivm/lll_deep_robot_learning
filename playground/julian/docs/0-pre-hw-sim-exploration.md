@@ -13,14 +13,34 @@ goes in `playground/julian/`, all outputs go in `outputs/` (git-ignored), and ne
 are added with `uv add`.
 
 ## Week 1: see the loop, learn just enough MuJoCo
-1. **Pretrained ACT on ALOHA sim** (½ day). Add `gym-aloha` (as a LeRobot extra) and run `lerobot-eval` on
-   `lerobot/act_aloha_sim_transfer_cube_human`. You get a rollout video and a success rate. Learn
-   the LeRobotDataset layout by browsing `lerobot/aloha_sim_transfer_cube_human`.
-   - **Open decision:** `lerobot[aloha]` pulls in `gym-aloha` → `dm-control`, which pins MuJoCo
-     to 3.8.1 and would downgrade the shared env from 4.0.1. Either accept the downgrade for the
-     team or run this demo in a separate env (about 2 GB of torch to download again). If you switch back and forth,
-     reinstall `mujoco`, `mujoco-core` and `mujoco-studio`: going 3.x → 4.x leaves the core bindings
-     broken.
+1. **Pretrained ACT on SO-101 in MuJoCo** (½ day). Use the Hugging Face ODSC workshop Space
+   [`pepijn223/odsc-lerobot-mujoco`](https://huggingface.co/spaces/pepijn223/odsc-lerobot-mujoco)
+   (Pepijn Kooijmans, Oct 2026). It bundles a pretrained ACT checkpoint
+   ([`pepijn223/odsc-so101-act`](https://huggingface.co/pepijn223/odsc-so101-act)) with its
+   pre/post-processors, a MuJoCo pick-into-tray scene built on the Menagerie SO-101 (the model we use
+   in step 2), and `rollout.py`. Reported results: ACT 35/50, scripted expert 48/50.
+   - **Why this instead of ALOHA:** it uses our robot, and `rollout.py` writes the inference loop out
+     by hand (`from_pretrained` + `make_pre_post_processors` → per step: observation → preprocess →
+     `select_action` → postprocess → `mj_step`). That is the loop `lerobot-eval` hides. It also ships a
+     LeRobot v3 dataset ([`pepijn223/odsc-so101-pick-place`](https://huggingface.co/datasets/pepijn223/odsc-so101-pick-place))
+     and the full training recipe (`train.sh`, `training-command.txt`), which are templates for week 2.
+   - **How:** follow its PREREQUISITES.md "Local option" in `outputs/odsc-lerobot-mujoco/` with its own
+     `.venv` and CPU torch. It pins `mujoco==3.3.1`, a LeRobot git commit and torch 2.11, so keeping it
+     separate leaves the shared env (MuJoCo 4.0.1, LeRobot 0.7) alone. Run `rollout.py` directly for an
+     ACT rollout video. Its Gradio app (`app.py`) is useful for browsing seeds and objects. Then browse
+     the dataset to learn the LeRobotDataset layout (two 384×384 cameras, six joint positions, absolute
+     joint-target actions at 20 Hz).
+   - **Optional follow-up:** try `rollout.py` in the shared env. It only uses basic MuJoCo calls, so it
+     will probably run, but physics can differ slightly between versions (the README notes outcomes
+     change even between EGL backends), so compare success against the pinned env.
+   - **Caveat:** the checkpoint is tied to this scene and joint calibration. It is not a policy for the
+     real arm.
+   - **Fallback, ALOHA sim** (`lerobot/act_aloha_sim_transfer_cube_human` via `lerobot[aloha]` +
+     `lerobot-eval`). This is the canonical ACT benchmark, but the arms aren't the SO-101. The old
+     downgrade problem has changed: `dm-control` 1.0.52 (Nov 2026) supports `mujoco>=4.0.1`, and the
+     remaining cap is `gym-aloha` 0.1.5's own `mujoco<3.9.0`. You can likely bypass it with
+     `[tool.uv] override-dependencies = ["mujoco>=4.0.1", "dm-control>=1.0.52"]`. This is untested, so try
+     it in a scratch copy before touching the shared `pyproject.toml`.
 2. **MuJoCo essentials on the real SO-101 model** (1-2 days). Use the standard SO-101 MJCF (TheRobotStudio
    SO-ARM100 repo or MuJoCo Menagerie). Work in a notebook: `MjModel`/`MjData`, `mj_step`, position
    actuators (these behave like the Feetech servos), adding a cube and table, cameras, offscreen render
@@ -60,6 +80,6 @@ can do. Julian has several devices to try, including a **Meta Quest 2**. Plan:
   on the real arm.
 
 ## Verification
-Each stage ends with something in `outputs/`: (1) an ALOHA eval video and success rate, (2) rendered
+Each stage ends with something in `outputs/`: (1) an SO-101 ACT rollout video from the ODSC checkpoint, (2) rendered
 SO-101 scene images, (3) a replayed community episode plus checkpoint eval, (4) our trained ACT
 success rate, (5-6) a new dataset plus a comparison table from the ablations.
