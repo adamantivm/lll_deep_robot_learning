@@ -22,17 +22,17 @@ dependencies = [
 # This is a workspace of experiments, not an installable package.
 package = false
 
-# PyTorch from the CUDA 12.6 index: runs on NVIDIA drivers >= 560 (PyPI's default
-# wheels target the newest CUDA and need a very recent driver). Bump to cu128/cu130
-# once everyone's driver supports it (`nvidia-smi` shows the max CUDA version).
+# PyTorch from the CUDA 13.0 index: needs NVIDIA driver >= 580 on the host and covers RTX 20-
+# through 50-series (the cu126 build has no RTX 50-series support). PyPI's default wheels
+# target the newest CUDA and need a very recent driver (`nvidia-smi` shows the max CUDA version).
 [tool.uv.sources]
-torch = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
-torchvision = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
-torchcodec = { index = "pytorch-cu126", marker = "sys_platform == 'linux'" }
+torch = { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }
+torchvision = { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }
+torchcodec = { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }
 
 [[tool.uv.index]]
-name = "pytorch-cu126"
-url = "https://download.pytorch.org/whl/cu126"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [dependency-groups]
