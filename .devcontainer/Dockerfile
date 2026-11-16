@@ -31,6 +31,12 @@ RUN usermod -aG dialout,video,plugdev vscode
 # uv for Python + dependency management
 COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /usr/local/bin/
 
+# Mount points for the cache volumes in devcontainer.json. Docker copies the image directory's
+# ownership onto a new empty named volume, so pre-creating these as vscode keeps them writable.
+# (Without this, the volumes come up root-owned and `uv sync` fails with "Permission denied".)
+RUN mkdir -p /home/vscode/.cache/uv /home/vscode/.cache/huggingface \
+    && chown -R vscode:vscode /home/vscode/.cache
+
 USER vscode
 ENV UV_PYTHON=3.12 \
     UV_LINK_MODE=copy \

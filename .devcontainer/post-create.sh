@@ -2,7 +2,8 @@
 # Runs inside the container once, after it is created.
 set -euo pipefail
 
-# Named volumes are created root-owned the first time.
+# The Dockerfile pre-creates these so new volumes are vscode-owned; this fixes up
+# volumes that were created root-owned before that change (or by an older image).
 sudo chown -R "$(id -u):$(id -g)" "$HOME/.cache/uv" "$HOME/.cache/huggingface"
 
 git lfs install --skip-repo >/dev/null
