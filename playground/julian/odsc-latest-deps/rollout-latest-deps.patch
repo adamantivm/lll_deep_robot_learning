@@ -1,7 +1,7 @@
 diff --git a/rollout.py b/rollout.py
 --- a/rollout.py
 +++ b/rollout.py
-@@ -36,6 +36,61 @@ def support_diagnostics(env):
+@@ -36,6 +36,74 @@ def support_diagnostics(env):
      return {"tray_floor_contact":support>1e-4,"tray_support_force_n":support}
  
  
@@ -11,14 +11,20 @@ diff --git a/rollout.py b/rollout.py
 +    The checkpoint was saved by a LeRobot dev build (7521ab48) whose ACTConfig and
 +    RelativeActionsProcessorStep had relative-action / pose-mode fields that LeRobot 0.7
 +    removed. Those fields are inert here (use_relative_actions=False, steps disabled), so
-+    we write cleaned JSON copies to `tmp` and symlink the unchanged .safetensors. Refuses
-+    if a field to drop is active. Returns `path` unchanged when nothing needs dropping
-+    (e.g. on the pinned env).
++    we write cleaned JSON copies to `tmp` and symlink the unchanged .safetensors. Only the
++    known relative-action keys below are ever dropped, and only while inactive; any other
++    unknown key raises. Returns `path` unchanged when nothing needs dropping (e.g. on the
++    pinned env).
 +    """
 +    import dataclasses, os
 +    from lerobot.policies.act.configuration_act import ACTConfig
 +    from lerobot.processor.pipeline import ProcessorStepRegistry
 +
++    droppable_config = {"use_relative_actions", "relative_exclude_joints", "relative_action_mode",
++                        "relative_pose_position_names", "relative_pose_rotation_names",
++                        "relative_pose_rotation_format", "relative_reference_key", "action_feature_names"}
++    droppable_steps = {"relative_actions_processor": {"mode", "position_names", "rotation_names",
++                                                      "rotation_format", "reference_key"}}
 +    src = Path(path)
 +    fixed, dropped = {}, {}
 +    # 1) policy config.json: keys unknown to ACTConfig
@@ -26,6 +32,9 @@ diff --git a/rollout.py b/rollout.py
 +    known = {f.name for f in dataclasses.fields(ACTConfig)} | {"type"}
 +    unknown = sorted(set(cfg) - known)
 +    if unknown:
++        if set(unknown) - droppable_config:
++            raise ValueError(f"Unknown config keys this compat shim doesn't handle: "
++                             f"{sorted(set(unknown) - droppable_config)}")
 +        if cfg.get("use_relative_actions"):
 +            raise ValueError(f"Cannot drop active relative-action fields: {unknown}")
 +        fixed["config.json"] = {k: v for k, v in cfg.items() if k not in unknown}
@@ -41,6 +50,10 @@ diff --git a/rollout.py b/rollout.py
 +            fields = {f.name for f in dataclasses.fields(step_cls)}
 +            extra = sorted(set(step.get("config", {})) - fields)
 +            if extra:
++                unhandled = sorted(set(extra) - droppable_steps.get(step["registry_name"], set()))
++                if unhandled:
++                    raise ValueError(f"Unknown keys {unhandled} in step {step['registry_name']} "
++                                     f"that this compat shim doesn't handle")
 +                if step["config"].get("enabled", True):
 +                    raise ValueError(f"Cannot drop fields {extra} of active step {step['registry_name']}")
 +                step["config"] = {k: v for k, v in step["config"].items() if k not in extra}
@@ -63,7 +76,7 @@ diff --git a/rollout.py b/rollout.py
  @lru_cache(maxsize=2)
  def load_policy(path, device="cpu", revision=None):
      import torch
-@@ -59,6 +114,9 @@ def load_policy(path, device="cpu", revision=None):
+@@ -59,6 +127,9 @@ def load_policy(path, device="cpu", revision=None):
          path = snapshot_download(
              path, revision=revision, allow_patterns=["*.json", "*.safetensors"]
          )
@@ -73,7 +86,7 @@ diff --git a/rollout.py b/rollout.py
      config = PreTrainedConfig.from_pretrained(path)
      config.device = device
      # All backbone tensors are already in the checkpoint. Avoid an unnecessary
-@@ -74,6 +132,7 @@ def load_policy(path, device="cpu", revision=None):
+@@ -74,6 +145,7 @@ def load_policy(path, device="cpu", revision=None):
          pretrained_path=path,
          preprocessor_overrides={"device_processor": {"device": device}},
      )

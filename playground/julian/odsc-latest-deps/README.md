@@ -57,6 +57,9 @@ JSONs to a temp dir (unknown keys dropped), symlinks the unchanged weights, and 
 
 MuJoCo 4 physics is ~20× faster on this scene. On the team env, rendering and the policy now take most of the time.
 
+Re-tested 2026-11-17 after the switch to PyTorch cu130 (torch 2.14.1+cu130): ACT 22/30 with the same failing seeds
+as on cu126, 13.0 ms per step; expert unchanged. ACT with `--device cuda` also succeeds and is ~2× faster than CPU.
+
 ## Gotchas
 
 - **ACT rollouts are not reproducible with NVIDIA EGL, on either env.** Rendering the same scene twice changes ~0.02%
