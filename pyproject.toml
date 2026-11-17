@@ -16,6 +16,10 @@ dependencies = [
     # Notebooks / plotting
     "ipykernel",
     "matplotlib",
+    # Sim tooling: rotations/IK (scipy), rollout videos (imageio + ffmpeg)
+    "scipy>=1.18",
+    "imageio>=2.38",
+    "imageio-ffmpeg>=0.8",
 ]
 
 [tool.uv]
