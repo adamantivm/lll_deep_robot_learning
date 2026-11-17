@@ -1,6 +1,9 @@
 {
   "name": "lll-deep-robot-learning",
   "build": { "dockerfile": "Dockerfile" },
+  // GitHub CLI (gh) for PRs/reviews. Log in once with `gh auth login`; the token is kept in the
+  // lll-gh-config volume below, so it survives rebuilds and stays out of the image and the repo.
+  "features": { "ghcr.io/devcontainers/features/github-cli:1": {} },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
 
@@ -36,7 +39,9 @@
     "source=${localEnv:HOME}/.claude.json,target=/home/vscode/.claude.json,type=bind",
     // Caches that should survive container rebuilds
     "source=lll-uv-cache,target=/home/vscode/.cache/uv,type=volume",
-    "source=lll-hf-cache,target=/home/vscode/.cache/huggingface,type=volume"
+    "source=lll-hf-cache,target=/home/vscode/.cache/huggingface,type=volume",
+    // GitHub CLI login (per machine)
+    "source=lll-gh-config,target=/home/vscode/.config/gh,type=volume"
   ],
 
   "containerEnv": {
