@@ -1,0 +1,108 @@
+diff --git a/rollout.py b/rollout.py
+--- a/rollout.py
++++ b/rollout.py
+@@ -36,6 +36,61 @@ def support_diagnostics(env):
+     return {"tray_floor_contact":support>1e-4,"tray_support_force_n":support}
+ 
+ 
++def _compat_checkpoint_dir(path, tmp):
++    """[latest-deps change] Return a checkpoint dir loadable by the installed LeRobot.
++
++    The checkpoint was saved by a LeRobot dev build (7521ab48) whose ACTConfig and
++    RelativeActionsProcessorStep had relative-action / pose-mode fields that LeRobot 0.7
++    removed. Those fields are inert here (use_relative_actions=False, steps disabled), so
++    we write cleaned JSON copies to `tmp` and symlink the unchanged .safetensors. Refuses
++    if a field to drop is active. Returns `path` unchanged when nothing needs dropping
++    (e.g. on the pinned env).
++    """
++    import dataclasses, os
++    from lerobot.policies.act.configuration_act import ACTConfig
++    from lerobot.processor.pipeline import ProcessorStepRegistry
++
++    src = Path(path)
++    fixed, dropped = {}, {}
++    # 1) policy config.json: keys unknown to ACTConfig
++    cfg = json.loads((src / "config.json").read_text())
++    known = {f.name for f in dataclasses.fields(ACTConfig)} | {"type"}
++    unknown = sorted(set(cfg) - known)
++    if unknown:
++        if cfg.get("use_relative_actions"):
++            raise ValueError(f"Cannot drop active relative-action fields: {unknown}")
++        fixed["config.json"] = {k: v for k, v in cfg.items() if k not in unknown}
++        dropped["config.json"] = unknown
++    # 2) processor pipelines: step-config keys unknown to the registered step class
++    for name in ("policy_preprocessor.json", "policy_postprocessor.json"):
++        pipe = json.loads((src / name).read_text())
++        changed = False
++        for step in pipe["steps"]:
++            step_cls = ProcessorStepRegistry.get(step["registry_name"])
++            if not dataclasses.is_dataclass(step_cls):
++                continue
++            fields = {f.name for f in dataclasses.fields(step_cls)}
++            extra = sorted(set(step.get("config", {})) - fields)
++            if extra:
++                if step["config"].get("enabled", True):
++                    raise ValueError(f"Cannot drop fields {extra} of active step {step['registry_name']}")
++                step["config"] = {k: v for k, v in step["config"].items() if k not in extra}
++                dropped[f"{name}:{step['registry_name']}"] = extra
++                changed = True
++        if changed:
++            fixed[name] = pipe
++    if not fixed:
++        return path
++    print(f"[compat] dropping inert keys unknown to this LeRobot: {dropped}")
++    for item in src.iterdir():
++        target = Path(tmp) / item.name
++        if item.name in fixed:
++            target.write_text(json.dumps(fixed[item.name], indent=2))
++        else:
++            os.symlink(item.resolve(), target)
++    return tmp
++
++
+ @lru_cache(maxsize=2)
+ def load_policy(path, device="cpu", revision=None):
+     import torch
+@@ -59,6 +114,9 @@ def load_policy(path, device="cpu", revision=None):
+         path = snapshot_download(
+             path, revision=revision, allow_patterns=["*.json", "*.safetensors"]
+         )
++    import tempfile
++    tmp = tempfile.TemporaryDirectory()  # [latest-deps change]
++    path = _compat_checkpoint_dir(path, tmp.name)  # [latest-deps change]
+     config = PreTrainedConfig.from_pretrained(path)
+     config.device = device
+     # All backbone tensors are already in the checkpoint. Avoid an unnecessary
+@@ -74,6 +132,7 @@ def load_policy(path, device="cpu", revision=None):
+         pretrained_path=path,
+         preprocessor_overrides={"device_processor": {"device": device}},
+     )
++    tmp.cleanup()  # [latest-deps change]
+     return policy, pre, post
+ 
+ 
+diff --git a/latest_deps_sweep.py b/latest_deps_sweep.py
+new file mode 100644
+--- /dev/null
++++ b/latest_deps_sweep.py
+@@ -0,0 +1,20 @@
++"""[latest-deps change] Small seed sweep to compare pinned vs team env. No video (rendering off).
++
++Usage: python latest_deps_sweep.py <label> <mode> <seed0> <n>   -> appends JSON lines to rollouts/sweep_<label>.jsonl
++"""
++import json, sys
++from pathlib import Path
++import mujoco
++import rollout
++
++label, mode, seed0, n = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
++revision = json.loads(Path(rollout.__file__).with_name("manifest.json").read_text()).get("model_revision")
++out = Path(rollout.__file__).with_name("rollouts") / f"sweep_{label}.jsonl"
++for seed in range(seed0, seed0 + n):
++    _, m = rollout.run(seed, mode, output="", revision=revision)
++    row = {k: m[k] for k in ("controller", "seed", "success", "control_steps", "object_xyz", "lift_m",
++                             "max_spare_displacement_m", "wall_seconds")}
++    row.update(label=label, mujoco=mujoco.__version__)
++    print(json.dumps(row), flush=True)
++    with out.open("a") as f:
++        f.write(json.dumps(row) + "\n")
